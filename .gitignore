@@ -7,3 +7,4 @@ Middlewares
 MAIN2 Debug.launch
 MAIN2.ioc
 STM32L072CZYX_FLASH.ld
+.settings
