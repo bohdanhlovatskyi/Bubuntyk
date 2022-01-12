@@ -55,6 +55,8 @@ osStatus_t status;
 FATFS FatFs;
 FIL telemetryFile;
 
+uint8_t firmwareChunk[2048];
+
 
 
 /* USER CODE END Variables */
@@ -255,16 +257,53 @@ void StartDefaultTask(void *argument)
 void startRxDataThread(void *argument)
 {
   /* USER CODE BEGIN startRxDataThread */
+	FRESULT wr;
+	UINT bytesWrote;
+	int cmpRes;
   /* Infinite loop */
   for(;;)
   {
 	  osSemaphoreAcquire(rxThreadSemHandle, osWaitForever);
 
+	  status = osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
+	  if (status != osOK) {
+		  myprintf("Could not take mutex for writing into file");
+	  } else {
+		  wr = f_open(&telemetryFile, "FIMWARE2.bin", FA_CREATE_ALWAYS);
+
+
+		  if(wr == FR_OK) {
+			  myprintf("I was able to open 'FIMWARE2.bin' for writing. Waiting for a chunk of code (up to 2048 bytes)\n");
+		  } else {
+			  myprintf("f_open error (%i)\n", wr);
+		  }
+
+
+		  for (;;) {
+			  HAL_UART_Receive(&huart2, firmwareChunk, 4, HAL_MAX_DELAY);
+			  cmpRes = strcmp(firmwareChunk, "$END");
+			  if (cmpRes == 0) {
+				  break;
+			  }
+
+			  wr = f_write(&telemetryFile, firmwareChunk, 4, &bytesWrote);
+			  if (wr == FR_OK) {
+				  myprintf("Wrote %i bytes to 'write.txt'!\n", bytesWrote);
+			  } else {
+				  myprintf("[ERROR]: f_write firmware (%d)\n", (int) bytesWrote);
+			  }
+		  }
+
+		  f_close(&telemetryFile);
+	  }
+
+	  osMutexRelease(telemetryFileMutexHandle);
+
 	 // thread is with the highest priority, as after the signal about new firmware
 	 // has come, we are not interested in data anymore
 
 
-	 // HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
+	 HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
   }
   /* USER CODE END startRxDataThread */
 }
@@ -321,7 +360,7 @@ void startTxDataThread(void *argument)
 	  myprintf("[READ]: %s\n", rbuf);
 
 	  // TODO: it should be done like this, though it does not work for some reason
-	  // HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
+	  HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
   }
   /* USER CODE END startTxDataThread */
 }
@@ -439,10 +478,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 			 break;
 		 default:
 			 myprintf("[ERROR]: Op not allowed: %d\n", val);
+			 HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
 			 break;
 		 };
 
-		 HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
      }
 }
 /* USER CODE END Application */
