@@ -55,9 +55,6 @@ osStatus_t status;
 FATFS FatFs;
 FIL telemetryFile;
 
-uint8_t firmwareChunk[2048];
-
-
 
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
@@ -71,14 +68,14 @@ const osThreadAttr_t defaultTask_attributes = {
 osThreadId_t rxDataThreadHandle;
 const osThreadAttr_t rxDataThread_attributes = {
   .name = "rxDataThread",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityRealtime,
 };
 /* Definitions for txDataThread */
 osThreadId_t txDataThreadHandle;
 const osThreadAttr_t txDataThread_attributes = {
   .name = "txDataThread",
-  .stack_size = 512 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for telemetryThread */
@@ -260,6 +257,8 @@ void startRxDataThread(void *argument)
 	FRESULT wr;
 	UINT bytesWrote;
 	int cmpRes;
+
+	uint8_t firmwareChunk[16];
   /* Infinite loop */
   for(;;)
   {
@@ -269,7 +268,7 @@ void startRxDataThread(void *argument)
 	  if (status != osOK) {
 		  myprintf("Could not take mutex for writing into file");
 	  } else {
-		  wr = f_open(&telemetryFile, "FIMWARE2.bin", FA_CREATE_ALWAYS);
+		  wr = f_open(&telemetryFile, "FIMWARE2.bin", FA_WRITE | FA_CREATE_ALWAYS);
 
 
 		  if(wr == FR_OK) {
@@ -280,6 +279,7 @@ void startRxDataThread(void *argument)
 
 
 		  for (;;) {
+			  memset(firmwareChunk, 0, sizeof(firmwareChunk));
 			  HAL_UART_Receive(&huart2, firmwareChunk, 4, HAL_MAX_DELAY);
 			  cmpRes = strcmp(firmwareChunk, "$END");
 			  if (cmpRes == 0) {
@@ -288,9 +288,10 @@ void startRxDataThread(void *argument)
 
 			  wr = f_write(&telemetryFile, firmwareChunk, 4, &bytesWrote);
 			  if (wr == FR_OK) {
-				  myprintf("Wrote %i bytes to 'write.txt'!\n", bytesWrote);
+				  // myprintf("Wrote %i bytes to 'write.txt'!\n", bytesWrote);
+				  ;
 			  } else {
-				  myprintf("[ERROR]: f_write firmware (%d)\n", (int) bytesWrote);
+				  myprintf("[ERROR]: f_write firmware (%d)\n", wr);
 			  }
 		  }
 
