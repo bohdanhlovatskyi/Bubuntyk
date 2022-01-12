@@ -76,7 +76,7 @@ const osThreadAttr_t rxDataThread_attributes = {
 osThreadId_t txDataThreadHandle;
 const osThreadAttr_t txDataThread_attributes = {
   .name = "txDataThread",
-  .stack_size = 128 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for telemetryThread */
@@ -100,6 +100,16 @@ const osTimerAttr_t temperatureTimer_attributes = {
 osMutexId_t telemetryFileMutexHandle;
 const osMutexAttr_t telemetryFileMutex_attributes = {
   .name = "telemetryFileMutex"
+};
+/* Definitions for txThreadSem */
+osSemaphoreId_t txThreadSemHandle;
+const osSemaphoreAttr_t txThreadSem_attributes = {
+  .name = "txThreadSem"
+};
+/* Definitions for rxThreadSem */
+osSemaphoreId_t rxThreadSemHandle;
+const osSemaphoreAttr_t rxThreadSem_attributes = {
+  .name = "rxThreadSem"
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -145,8 +155,17 @@ void MX_FREERTOS_Init(void) {
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
 
+  /* Create the semaphores(s) */
+  /* creation of txThreadSem */
+  txThreadSemHandle = osSemaphoreNew(1, 1, &txThreadSem_attributes);
+
+  /* creation of rxThreadSem */
+  rxThreadSemHandle = osSemaphoreNew(1, 1, &rxThreadSem_attributes);
+
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
+  osSemaphoreAcquire(txThreadSemHandle, 0);
+  osSemaphoreAcquire(rxThreadSemHandle, 0);
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* Create the timer(s) */
@@ -160,7 +179,7 @@ void MX_FREERTOS_Init(void) {
   /* start timers, add new ones, ... */
 
   if (accTimerHandle != NULL)  {
-      status = osTimerStart(accTimerHandle, 2000U);       // start timer
+      status = osTimerStart(accTimerHandle, 10000U);       // start timer
       if (status != osOK) {
         // Timer could not be started
     	Error_Handler();
@@ -170,7 +189,7 @@ void MX_FREERTOS_Init(void) {
   }
 
   if (temperatureTimerHandle != NULL)  {
-        status = osTimerStart(temperatureTimerHandle, 2000U);       // start timer
+        status = osTimerStart(temperatureTimerHandle, 10000U);       // start timer
         if (status != osOK) {
           // Timer could not be started
       	Error_Handler();
@@ -239,13 +258,13 @@ void startRxDataThread(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	 osThreadFlagsWait(0x00000001U, osFlagsWaitAny, osWaitForever);
+	  osSemaphoreAcquire(rxThreadSemHandle, osWaitForever);
 
 	 // thread is with the highest priority, as after the signal about new firmware
 	 // has come, we are not interested in data anymore
 
 
-	 HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
+	 // HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
   }
   /* USER CODE END startRxDataThread */
 }
@@ -260,18 +279,49 @@ void startRxDataThread(void *argument)
 void startTxDataThread(void *argument)
 {
   /* USER CODE BEGIN startTxDataThread */
+	FRESULT rr;
+	// TODO: get rid of magic constants
+	BYTE rbuf[128] = {0};
   /* Infinite loop */
   for(;;)
   {
-	  osThreadFlagsWait(0x00000002U, osFlagsWaitAny, osWaitForever);
+	  osSemaphoreAcquire(txThreadSemHandle, osWaitForever);
 
 	  // there is no need to take mutex, as currenlty this is the only task
 	  // that actually uses uart (if we omit the debug part)
 
 	  // read from sd and write the info into uart (mock gprs)
+	  status = osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
+	  if (status != osOK) {
+		  myprintf("Could not take mutex for reading into file");
+	  } else {
+		  rr = f_open(&telemetryFile, "write.txt", FA_READ);
 
 
-	  HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
+		  if(rr == FR_OK) {
+			  myprintf("I was able to open '%s' for reading\n", TELEMETRY_FILE);
+		  } else {
+			  myprintf("[ERROR]: (reading) f_open (%i)\n", rr);
+		  }
+
+
+		  UINT bytesRead = (UINT) -1;
+		  while (bytesRead != 0) {
+			  f_read(&telemetryFile, &rbuf, sizeof(rbuf), &bytesRead);
+			  myprintf("[READ]: %s\n", rbuf);
+		  }
+
+		  f_close(&telemetryFile);
+		  f_unlink("write.txt");
+	  }
+
+	  osMutexRelease(telemetryFileMutexHandle);
+
+	  // note that TODO: use different uart that won't need mutex acquisition
+	  myprintf("[READ]: %s\n", rbuf);
+
+	  // TODO: it should be done like this, though it does not work for some reason
+	  // HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
   }
   /* USER CODE END startTxDataThread */
 }
@@ -289,7 +339,7 @@ void startTelemetryThread(void *argument)
   TelemetryBase tb;
   FRESULT wr;
   // TODO: get rid of magic constant
-  BYTE wbuf[30];
+  BYTE wbuf[128] = {0};
 
   /* Infinite loop */
   for(;;)
@@ -305,26 +355,33 @@ void startTelemetryThread(void *argument)
 
 
 		 // TODO: add mutex here
-		 wr = f_open(&telemetryFile, "write.txt", FA_WRITE | FA_OPEN_ALWAYS);
-
-
-		 if(wr == FR_OK) {
-		   	myprintf("I was able to open '%s' for writing\n", TELEMETRY_FILE);
+		 status = osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
+		 if (status != osOK) {
+			 myprintf("Could not take mutex for writing into file");
 		 } else {
-		   	myprintf("f_open error (%i)\n", wr);
-		 }
+		 	 wr = f_open(&telemetryFile, "write.txt", FA_WRITE | FA_OPEN_ALWAYS);
 
 
-		 UINT bytesWrote;
-		 // TODO: and also I assume we should add mutex here
-		 wr = f_write(&telemetryFile, wbuf, 19, &bytesWrote);
-		 if(wr == FR_OK) {
-		   	myprintf("Wrote %i bytes to 'write.txt'!\n", bytesWrote);
-		 } else {
-		   	myprintf("f_write error (%d)\n", (int) bytesWrote);
-		 }
+		 	 if(wr == FR_OK) {
+		 		 myprintf("I was able to open '%s' for writing\n", TELEMETRY_FILE);
+		 	 } else {
+		 		 myprintf("f_open error (%i)\n", wr);
+		 	 }
 
-		 f_close(&telemetryFile);
+
+		 	 UINT bytesWrote;
+		 	 // TODO: and also I assume we should add mutex here
+		 	 wr = f_write(&telemetryFile, wbuf, strlen(wbuf), &bytesWrote);
+		 	 if(wr == FR_OK) {
+		 		 myprintf("Wrote %i bytes to 'write.txt'!\n", bytesWrote);
+		 	 } else {
+		 		 myprintf("f_write error (%d)\n", (int) bytesWrote);
+		 	 }
+
+		 	 f_close(&telemetryFile);
+	 	 }
+
+		 osMutexRelease(telemetryFileMutexHandle);
 	 }
   }
   /* USER CODE END startTelemetryThread */
@@ -375,15 +432,17 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     	 int val = (int) (notification_buffer[0] - '0');
 		 switch (val) {
 		 case 0:
-			 osThreadFlagsSet(rxDataThreadHandle, 0x00000001U);
+			 osSemaphoreRelease(rxThreadSemHandle);
 			 break;
 		 case 1:
-			 osThreadFlagsSet(txDataThreadHandle, 0x00000002U);
+			 osSemaphoreRelease(txThreadSemHandle);
 			 break;
 		 default:
 			 myprintf("[ERROR]: Op not allowed: %d\n", val);
 			 break;
 		 };
+
+		 HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
      }
 }
 /* USER CODE END Application */

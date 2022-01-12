@@ -1,8 +1,8 @@
-freertos.c:122:6:MX_FREERTOS_Init	16	static
-freertos.c:210:6:StartDefaultTask	16	static
-freertos.c:228:6:startRxDataThread	16	static
-freertos.c:252:6:startTxDataThread	16	static
-freertos.c:278:6:startTelemetryThread	136	static
-freertos.c:326:6:accTimerCallback	80	static
-freertos.c:344:6:temperatureTimerCallback	80	static
-freertos.c:365:6:HAL_UART_RxCpltCallback	24	static
+freertos.c:137:6:MX_FREERTOS_Init	16	static
+freertos.c:237:6:StartDefaultTask	16	static
+freertos.c:255:6:startRxDataThread	16	static
+freertos.c:279:6:startTxDataThread	152	static
+freertos.c:336:6:startTelemetryThread	232	static
+freertos.c:391:6:accTimerCallback	80	static
+freertos.c:409:6:temperatureTimerCallback	80	static
+freertos.c:430:6:HAL_UART_RxCpltCallback	24	static

@@ -44,7 +44,7 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-static char msg[256];
+static char msg[512];
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/
