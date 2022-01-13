@@ -86,6 +86,13 @@ const osThreadAttr_t telemetryThread_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityBelowNormal,
 };
+/* Definitions for peripheryThread */
+osThreadId_t peripheryThreadHandle;
+const osThreadAttr_t peripheryThread_attributes = {
+  .name = "peripheryThread",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* Definitions for accTimer */
 osTimerId_t accTimerHandle;
 const osTimerAttr_t accTimer_attributes = {
@@ -95,6 +102,16 @@ const osTimerAttr_t accTimer_attributes = {
 osTimerId_t temperatureTimerHandle;
 const osTimerAttr_t temperatureTimer_attributes = {
   .name = "temperatureTimer"
+};
+/* Definitions for gpsTimer */
+osTimerId_t gpsTimerHandle;
+const osTimerAttr_t gpsTimer_attributes = {
+  .name = "gpsTimer"
+};
+/* Definitions for lightTimer */
+osTimerId_t lightTimerHandle;
+const osTimerAttr_t lightTimer_attributes = {
+  .name = "lightTimer"
 };
 /* Definitions for txThreadSem */
 osSemaphoreId_t txThreadSemHandle;
@@ -126,8 +143,11 @@ void StartDefaultTask(void *argument);
 void startRxDataThread(void *argument);
 void startTxDataThread(void *argument);
 void startTelemetryThread(void *argument);
+void startPeripheryThread(void *argument);
 void accTimerCallback(void *argument);
 void temperatureTimerCallback(void *argument);
+void gpsTimerCallback(void *argument);
+void lightTimerCallback(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -175,6 +195,12 @@ void MX_FREERTOS_Init(void) {
   /* creation of temperatureTimer */
   temperatureTimerHandle = osTimerNew(temperatureTimerCallback, osTimerPeriodic, NULL, &temperatureTimer_attributes);
 
+  /* creation of gpsTimer */
+  gpsTimerHandle = osTimerNew(gpsTimerCallback, osTimerPeriodic, NULL, &gpsTimer_attributes);
+
+  /* creation of lightTimer */
+  lightTimerHandle = osTimerNew(lightTimerCallback, osTimerPeriodic, NULL, &lightTimer_attributes);
+
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
 
@@ -197,6 +223,26 @@ void MX_FREERTOS_Init(void) {
     } else {
   	  Error_Handler();
     }
+
+  if (gpsTimerHandle != NULL)  {
+          status = osTimerStart(gpsTimerHandle, 10000U);       // start timer
+          if (status != osOK) {
+            // Timer could not be started
+        	Error_Handler();
+          }
+      } else {
+    	  Error_Handler();
+      }
+
+  if (lightTimerHandle != NULL)  {
+      status = osTimerStart(lightTimerHandle, 10000U);       // start timer
+      if (status != osOK) {
+          // Timer could not be started
+          Error_Handler();
+      }
+   } else {
+      Error_Handler();
+   }
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -216,6 +262,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of telemetryThread */
   telemetryThreadHandle = osThreadNew(startTelemetryThread, NULL, &telemetryThread_attributes);
+
+  /* creation of peripheryThread */
+  peripheryThreadHandle = osThreadNew(startPeripheryThread, NULL, &peripheryThread_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -436,21 +485,100 @@ void startTelemetryThread(void *argument)
   /* USER CODE END startTelemetryThread */
 }
 
+/* USER CODE BEGIN Header_startPeripheryThread */
+/**
+* @brief Function implementing the peripheryThread thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_startPeripheryThread */
+void startPeripheryThread(void *argument)
+{
+  /* USER CODE BEGIN startPeripheryThread */
+
+	uint32_t flags;
+	TelemetryBase tb;
+	int16_t Data[6];
+	float pressure, temperature, humidity;
+
+	float TEMT6000_lux;
+
+  /* Infinite loop */
+  for(;;)
+  {
+
+	  osThreadFlagsWait(0x11111111U, osFlagsNoClear, osWaitForever);
+	  flags = osThreadFlagsGet();
+	  osThreadFlagsClear(flags);
+
+	  switch (flags) {
+	  case (0x00000001U):
+	  	    MPU6050_GetAllData(Data);
+
+			tb.id = ACC;
+	  	  	tb.data_size = 3;
+	  	  	tb.data[0] = Data[0];
+	  	  	tb.data[1] = Data[1];
+	  	  	tb.data[2] = Data[2];
+
+	  	  	osMessageQueuePut(telemetryQueueHandle, &tb, 0U, 0U);
+
+	  	  	tb.id = GYRO;
+	  	  	tb.data_size = 3;
+	  	  	tb.data[0] = Data[3];
+	  	  	tb.data[1] = Data[4];
+	  	  	tb.data[2] = Data[5];
+
+	  	  	break;
+
+	  case (0x00000010U):
+			tb.id = HTP;
+	  	  	tb.data_size = 3;
+
+			while (!bmp280_read_float(&bmp280, &temperature, &pressure, &humidity));
+			tb.data[0] = (int) temperature;
+			tb.data[1] = (int) pressure;
+			tb.data[2] = (int) humidity;
+
+			break;
+
+	  case (0x00000100U):
+
+			while (!GPS_read());
+
+			tb.id = NEO6M;
+			tb.data_size = 3;
+			tb.data[0] = (int) GPS.utc_time;
+			tb.data[1] = (int) GPS_nmea_to_dec(GPS.nmea_latitude, GPS.ns);
+			tb.data[2] = (int) GPS_nmea_to_dec(GPS.nmea_longitude, GPS.ew);
+
+			break;
+
+	  case (0x00001000U):
+
+			tb.id = LIGHT;
+	  	  	tb.data_size = 1;
+
+	  	    while (TEMT6000_OK != TEMT6000_ReadLight(&TEMT6000_lux));
+
+	  	    tb.data[0] = (int) TEMT6000_lux;
+
+			break;
+	  default:
+		  break;
+
+	  }
+
+	  osMessageQueuePut(telemetryQueueHandle, &tb, 0U, 0U);
+  }
+  /* USER CODE END startPeripheryThread */
+}
+
 /* accTimerCallback function */
 void accTimerCallback(void *argument)
 {
   /* USER CODE BEGIN accTimerCallback */
-	TelemetryBase acc;
-
-	acc.id = ACC;
-	acc.data_size = 3;
-	for (size_t i = 0; i < acc.data_size; i++) {
-		acc.data[i] = i;
-	}
-
-	// note that this might be called from isr, if the
-	// time parameter is set to 0
-	osMessageQueuePut(telemetryQueueHandle, &acc, 0U, 0U);
+	osThreadFlagsSet(peripheryThreadHandle, 0x00000001U);
   /* USER CODE END accTimerCallback */
 }
 
@@ -458,16 +586,24 @@ void accTimerCallback(void *argument)
 void temperatureTimerCallback(void *argument)
 {
   /* USER CODE BEGIN temperatureTimerCallback */
-	TelemetryBase acc;
-
-	acc.id = ACC;
-	acc.data_size = 3;
-	for (size_t i = 0; i < acc.data_size; i++) {
-		acc.data[i] = acc.data_size - i;
-	}
-
-	osMessageQueuePut(telemetryQueueHandle, &acc, 0U, 0U);
+	osThreadFlagsSet(peripheryThreadHandle, 0x00000010U);
   /* USER CODE END temperatureTimerCallback */
+}
+
+/* gpsTimerCallback function */
+void gpsTimerCallback(void *argument)
+{
+  /* USER CODE BEGIN gpsTimerCallback */
+	osThreadFlagsSet(peripheryThreadHandle, 0x00000100U);
+  /* USER CODE END gpsTimerCallback */
+}
+
+/* lightTimerCallback function */
+void lightTimerCallback(void *argument)
+{
+  /* USER CODE BEGIN lightTimerCallback */
+	osThreadFlagsSet(peripheryThreadHandle, 0x00001000U);
+  /* USER CODE END lightTimerCallback */
 }
 
 /* Private application code --------------------------------------------------*/

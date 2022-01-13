@@ -10,7 +10,7 @@
 
 #include "main.h"
 
-enum Sensor{ACC, GYRO, TEMP};
+enum Sensor{ACC, GYRO, HTP, LIGHT, NEO6M};
 
 typedef struct {
 	enum Sensor id;

@@ -73,8 +73,8 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef* i2cHandle)
     */
     GPIO_InitStruct.Pin = Audio_SCL_Pin|Audio_SDA_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
@@ -112,7 +112,35 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
 }
 
 /* USER CODE BEGIN 1 */
+int I2C_WriteBuffer(uint8_t I2C_ADDRESS, uint8_t *aTxBuffer, uint8_t TXBUFFERSIZE) {
+    while(HAL_I2C_Master_Transmit(&hi2c1, (uint16_t)I2C_ADDRESS<<1, (uint8_t*)aTxBuffer, (uint16_t)TXBUFFERSIZE, (uint32_t)1000)!= HAL_OK){
+        if (HAL_I2C_GetError(&hi2c1) != HAL_I2C_ERROR_AF){
+            // _Error_Handler(__FILE__, aTxBuffer[0]);
+        	return 1;
+        }
 
+    }
+
+      while (HAL_I2C_GetState(&hi2c1) != HAL_I2C_STATE_READY){}
+
+      return 0;
+}
+
+int I2C_ReadBuffer(uint8_t I2C_ADDRESS, uint8_t RegAddr, uint8_t *aRxBuffer, uint8_t RXBUFFERSIZE){
+
+    I2C_WriteBuffer(I2C_ADDRESS, &RegAddr, 1);
+
+    while(HAL_I2C_Master_Receive(&hi2c1, (uint16_t)I2C_ADDRESS<<1, aRxBuffer, (uint16_t)RXBUFFERSIZE, (uint32_t)1000) != HAL_OK){
+        if (HAL_I2C_GetError(&hi2c1) != HAL_I2C_ERROR_AF){
+            // _Error_Handler(__FILE__, __LINE__);
+        	return 1;
+        }
+    }
+
+    while (HAL_I2C_GetState(&hi2c1) != HAL_I2C_STATE_READY){}
+
+    return 0;
+}
 /* USER CODE END 1 */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

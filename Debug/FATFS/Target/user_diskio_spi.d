@@ -19,6 +19,9 @@ FATFS/Target/user_diskio_spi.o: ../FATFS/Target/user_diskio_spi.c \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_dma.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_dma_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_cortex.h \
+ ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_adc.h \
+ ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_adc.h \
+ ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_adc_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ramfunc.h \
@@ -38,6 +41,8 @@ FATFS/Target/user_diskio_spi.o: ../FATFS/Target/user_diskio_spi.c \
  ../Middlewares/Third_Party/FatFs/src/diskio.h \
  ../Middlewares/Third_Party/FatFs/src/ff.h ../FATFS/Target/ffconf.h \
  ../Core/Inc/main.h ../Core/Inc/usart.h ../Core/Inc/main.h \
+ ../Core/Inc/i2c.h ../Core/Inc/mpu6050.h ../Core/Inc/bmp280.h \
+ ../Core/Inc/NEO6_M.h ../Core/Inc/temt6000.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h \
  ../Core/Inc/FreeRTOSConfig.h \
@@ -90,6 +95,12 @@ FATFS/Target/user_diskio_spi.o: ../FATFS/Target/user_diskio_spi.c \
 
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_cortex.h:
 
+../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_adc.h:
+
+../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_adc.h:
+
+../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_adc_ex.h:
+
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash.h:
 
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ex.h:
@@ -133,6 +144,16 @@ FATFS/Target/user_diskio_spi.o: ../FATFS/Target/user_diskio_spi.c \
 ../Core/Inc/usart.h:
 
 ../Core/Inc/main.h:
+
+../Core/Inc/i2c.h:
+
+../Core/Inc/mpu6050.h:
+
+../Core/Inc/bmp280.h:
+
+../Core/Inc/NEO6_M.h:
+
+../Core/Inc/temt6000.h:
 
 ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h:
 

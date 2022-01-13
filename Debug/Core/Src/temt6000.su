@@ -1,0 +1,2 @@
+temt6000.c:24:17:TEMT6000_Init	16	static
+temt6000.c:34:17:TEMT6000_ReadLight	24	static

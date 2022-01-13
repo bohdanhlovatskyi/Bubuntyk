@@ -91,8 +91,8 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(CS_I2C_SPI_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PEPin PEPin PEPin */
-  GPIO_InitStruct.Pin = INT1_Pin|INT2_Pin|MEMS_INT2_Pin;
+  /*Configure GPIO pins : PEPin PEPin */
+  GPIO_InitStruct.Pin = INT1_Pin|INT2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);

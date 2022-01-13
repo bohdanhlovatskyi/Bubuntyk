@@ -35,6 +35,12 @@ extern "C" {
 #include <stdio.h>
 #include <string.h>
 #include "usart.h"
+#include "i2c.h"
+
+#include "mpu6050.h"
+#include "bmp280.h"
+#include "NEO6_M.h"
+#include "temt6000.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -131,8 +137,6 @@ void Error_Handler(void);
 #define Audio_SCL_GPIO_Port GPIOB
 #define Audio_SDA_Pin GPIO_PIN_9
 #define Audio_SDA_GPIO_Port GPIOB
-#define MEMS_INT2_Pin GPIO_PIN_1
-#define MEMS_INT2_GPIO_Port GPIOE
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

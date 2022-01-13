@@ -40,7 +40,8 @@ extern I2C_HandleTypeDef hi2c1;
 void MX_I2C1_Init(void);
 
 /* USER CODE BEGIN Prototypes */
-
+int I2C_WriteBuffer(uint8_t I2C_ADDRESS, uint8_t *aTxBuffer, uint8_t TXBUFFERSIZE);
+int I2C_ReadBuffer(uint8_t I2C_ADDRESS, uint8_t RegAddr, uint8_t *aRxBuffer, uint8_t RXBUFFERSIZE);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

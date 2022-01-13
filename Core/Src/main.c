@@ -20,6 +20,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "adc.h"
+#include "dma.h"
 #include "fatfs.h"
 #include "i2c.h"
 #include "spi.h"
@@ -97,10 +99,34 @@ int main(void)
   MX_SPI1_Init();
   MX_FATFS_Init();
   MX_USART2_UART_Init();
+  MX_DMA_Init();
+  MX_ADC1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   // delay needed for sd to stabilize as well as to make the upload
   // of new firmware possible (boot related issue);
   HAL_Delay(2000);
+
+  int initStatus = -1;
+
+  initStatus = MPU6050_Init();
+  myprintf("[INFO]: acc, gyro initialisation status: %d\n", initStatus);
+
+  bmp280_init_default_params(&bmp280.params);
+  bmp280.addr = BMP280_I2C_ADDRESS_0;
+  bmp280.i2c = &hi2c1;
+
+  while (!bmp280_init(&bmp280, &bmp280.params)) {
+      	myprintf("[ERROR]: bmp280 init failed\n");
+      	HAL_Delay(2000);
+  }
+
+  myprintf("bmp280 initialized\n");
+
+  while (TEMT6000_Init(&hadc1) != TEMT6000_OK) {
+	  myprintf("[ERROR]: temt6000 init failed\n");
+	  HAL_Delay(2000);
+  }
 
   // run in the background receive from uart
   // in order to implment possibility to wake up
