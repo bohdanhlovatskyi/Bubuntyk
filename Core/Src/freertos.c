@@ -75,7 +75,7 @@ const osThreadAttr_t rxDataThread_attributes = {
 osThreadId_t txDataThreadHandle;
 const osThreadAttr_t txDataThread_attributes = {
   .name = "txDataThread",
-  .stack_size = 1024 * 4,
+  .stack_size = 2048 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for telemetryThread */
@@ -321,7 +321,7 @@ void startTxDataThread(void *argument)
   /* USER CODE BEGIN startTxDataThread */
 	FRESULT rr;
 	// TODO: get rid of magic constants
-	BYTE rbuf[128] = {0};
+	BYTE rbuf[32] = {0};
   /* Infinite loop */
   for(;;)
   {
@@ -344,6 +344,8 @@ void startTxDataThread(void *argument)
 			  myprintf("[ERROR]: (reading) f_open (%i)\n", rr);
 		  }
 
+		  // TODO: do we really need this one here ?
+		  f_lseek(&telemetryFile, 0);
 
 		  UINT bytesRead = (UINT) -1;
 		  while (bytesRead != 0) {
@@ -355,6 +357,7 @@ void startTxDataThread(void *argument)
 		  f_unlink("write.txt");
 	  }
 
+	  // TODO: possible source of error
 	  osMutexRelease(telemetryFileMutexHandle);
 
 	  // note that TODO: use different uart that won't need mutex acquisition
@@ -399,7 +402,7 @@ void startTelemetryThread(void *argument)
 		 if (status != osOK) {
 			 myprintf("Could not take mutex for writing into file");
 		 } else {
-		 	 wr = f_open(&telemetryFile, "write.txt", FA_WRITE | FA_OPEN_ALWAYS);
+		 	 wr = f_open(&telemetryFile, "write.txt", FA_OPEN_APPEND | FA_WRITE | FA_OPEN_ALWAYS);
 
 
 		 	 if(wr == FR_OK) {
@@ -475,7 +478,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 			 osSemaphoreRelease(rxThreadSemHandle);
 			 break;
 		 case 1:
-			 osSemaphoreRelease(txThreadSemHandle);
+			 status = osSemaphoreRelease(txThreadSemHandle);
+			 myprintf("[INFO]: status of semaphore release: %d\n", status);
 			 break;
 		 default:
 			 myprintf("[ERROR]: Op not allowed: %d\n", val);
