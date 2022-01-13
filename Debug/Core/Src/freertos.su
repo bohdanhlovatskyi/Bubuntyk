@@ -1,7 +1,7 @@
-freertos.c:136:6:MX_FREERTOS_Init	16	static
+freertos.c:138:6:MX_FREERTOS_Init	16	static
 freertos.c:236:6:StartDefaultTask	16	static
 freertos.c:254:6:startRxDataThread	48	static
-freertos.c:319:6:startTxDataThread	56	static
+freertos.c:318:6:startTxDataThread	56	static
 freertos.c:378:6:startTelemetryThread	232	static
 freertos.c:433:6:accTimerCallback	80	static
 freertos.c:451:6:temperatureTimerCallback	80	static

@@ -75,7 +75,7 @@ const osThreadAttr_t rxDataThread_attributes = {
 osThreadId_t txDataThreadHandle;
 const osThreadAttr_t txDataThread_attributes = {
   .name = "txDataThread",
-  .stack_size = 2048 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for telemetryThread */
@@ -95,11 +95,6 @@ osTimerId_t temperatureTimerHandle;
 const osTimerAttr_t temperatureTimer_attributes = {
   .name = "temperatureTimer"
 };
-/* Definitions for telemetryFileMutex */
-osMutexId_t telemetryFileMutexHandle;
-const osMutexAttr_t telemetryFileMutex_attributes = {
-  .name = "telemetryFileMutex"
-};
 /* Definitions for txThreadSem */
 osSemaphoreId_t txThreadSemHandle;
 const osSemaphoreAttr_t txThreadSem_attributes = {
@@ -116,6 +111,13 @@ const osSemaphoreAttr_t rxThreadSem_attributes = {
 osMessageQueueId_t telemetryQueueHandle;
 const osMessageQueueAttr_t telemetryQueue_attributes = {
   .name = "telemetryQueue"
+};
+
+
+osMutexId_t telemetryFileMutexHandle;
+const osMutexAttr_t telemetryFileMutex_attributes = {
+  .name = "telemetryFileMutex",
+  .attr_bits = osMutexPrioInherit
 };
 /* USER CODE END FunctionPrototypes */
 
@@ -146,12 +148,10 @@ void MX_FREERTOS_Init(void) {
 		myprintf("SD card mounted\n");
 	}
   /* USER CODE END Init */
-  /* Create the mutex(es) */
-  /* creation of telemetryFileMutex */
-  telemetryFileMutexHandle = osMutexNew(&telemetryFileMutex_attributes);
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
+  telemetryFileMutexHandle = osMutexNew(&telemetryFileMutex_attributes);
   /* USER CODE END RTOS_MUTEX */
 
   /* Create the semaphores(s) */
@@ -254,6 +254,8 @@ void StartDefaultTask(void *argument)
 void startRxDataThread(void *argument)
 {
   /* USER CODE BEGIN startRxDataThread */
+	 // thread is with the highest priority, as after the signal about new firmware
+	 // has come, we are not interested in data anymore
 	FRESULT wr;
 	UINT bytesWrote;
 	int cmpRes;
@@ -264,45 +266,42 @@ void startRxDataThread(void *argument)
   {
 	  osSemaphoreAcquire(rxThreadSemHandle, osWaitForever);
 
+	  myprintf("Firmware to be uploaded...\n");
+
 	  status = osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
 	  if (status != osOK) {
 		  myprintf("Could not take mutex for writing into file");
 	  } else {
 		  wr = f_open(&telemetryFile, "FIMWARE2.bin", FA_WRITE | FA_CREATE_ALWAYS);
 
-
-		  if(wr == FR_OK) {
-			  myprintf("I was able to open 'FIMWARE2.bin' for writing. Waiting for a chunk of code (up to 2048 bytes)\n");
-		  } else {
+		  osMutexRelease(telemetryFileMutexHandle);
+		  if(wr != FR_OK) {
 			  myprintf("f_open error (%i)\n", wr);
-		  }
+		  } else {
+			  for (;;) {
+				  memset(firmwareChunk, 0, sizeof(firmwareChunk));
+				  HAL_UART_Receive(&huart2, firmwareChunk, 4, HAL_MAX_DELAY);
+				  cmpRes = strcmp(firmwareChunk, "$END");
+				  if (cmpRes == 0) {
+					  break;
+				  }
 
+				  osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
+				  wr = f_write(&telemetryFile, firmwareChunk, 4, &bytesWrote);
+				  osMutexRelease(telemetryFileMutexHandle);
 
-		  for (;;) {
-			  memset(firmwareChunk, 0, sizeof(firmwareChunk));
-			  HAL_UART_Receive(&huart2, firmwareChunk, 4, HAL_MAX_DELAY);
-			  cmpRes = strcmp(firmwareChunk, "$END");
-			  if (cmpRes == 0) {
-				  break;
+				  if (wr != FR_OK) {
+					  myprintf("[ERROR]: f_write firmware (%d)\n", wr);
+					  break;
+				  }
 			  }
 
-			  wr = f_write(&telemetryFile, firmwareChunk, 4, &bytesWrote);
-			  if (wr == FR_OK) {
-				  // myprintf("Wrote %i bytes to 'write.txt'!\n", bytesWrote);
-				  ;
-			  } else {
-				  myprintf("[ERROR]: f_write firmware (%d)\n", wr);
-			  }
-		  }
 
-		  f_close(&telemetryFile);
+			  osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
+			  f_close(&telemetryFile);
+			  osMutexRelease(telemetryFileMutexHandle);
+		  }
 	  }
-
-	  osMutexRelease(telemetryFileMutexHandle);
-
-	 // thread is with the highest priority, as after the signal about new firmware
-	 // has come, we are not interested in data anymore
-
 
 	 HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
   }
@@ -325,7 +324,9 @@ void startTxDataThread(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  osSemaphoreAcquire(txThreadSemHandle, osWaitForever);
+	  status = osSemaphoreAcquire(txThreadSemHandle, osWaitForever);
+	  myprintf("[INFO]: txDataThread : sem acquire : (%d)\n", status);
+
 
 	  // there is no need to take mutex, as currenlty this is the only task
 	  // that actually uses uart (if we omit the debug part)
@@ -337,33 +338,28 @@ void startTxDataThread(void *argument)
 	  } else {
 		  rr = f_open(&telemetryFile, "write.txt", FA_READ);
 
-
-		  if(rr == FR_OK) {
-			  myprintf("I was able to open '%s' for reading\n", TELEMETRY_FILE);
-		  } else {
+		  if(rr != FR_OK) {
+			  osMutexRelease(telemetryFileMutexHandle);
 			  myprintf("[ERROR]: (reading) f_open (%i)\n", rr);
+		  } else {
+			  // TODO: do we really need this one here ?
+			  // f_lseek(&telemetryFile, 0);
+
+			  unsigned int bytesRead = 1;
+		  	  while (bytesRead != 0) {
+			  	  f_read(&telemetryFile, &rbuf, sizeof(rbuf), &bytesRead);
+			  	  osMutexRelease(telemetryFileMutexHandle);
+			  	  myprintf("[READ]: %s\n", rbuf);
+			  	  osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
+		  	  }
+
+		  	  f_close(&telemetryFile);
+		  	  f_unlink("write.txt");
+
+		  	  osMutexRelease(telemetryFileMutexHandle);
 		  }
-
-		  // TODO: do we really need this one here ?
-		  f_lseek(&telemetryFile, 0);
-
-		  UINT bytesRead = (UINT) -1;
-		  while (bytesRead != 0) {
-			  f_read(&telemetryFile, &rbuf, sizeof(rbuf), &bytesRead);
-			  myprintf("[READ]: %s\n", rbuf);
-		  }
-
-		  f_close(&telemetryFile);
-		  f_unlink("write.txt");
 	  }
 
-	  // TODO: possible source of error
-	  osMutexRelease(telemetryFileMutexHandle);
-
-	  // note that TODO: use different uart that won't need mutex acquisition
-	  myprintf("[READ]: %s\n", rbuf);
-
-	  // TODO: it should be done like this, though it does not work for some reason
 	  HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
   }
   /* USER CODE END startTxDataThread */

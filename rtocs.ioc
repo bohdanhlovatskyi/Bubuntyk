@@ -1,9 +1,8 @@
 #MicroXplorer Configuration settings - do not modify
 FREERTOS.BinarySemaphores01=txThreadSem,Dynamic,NULL;rxThreadSem,Dynamic,NULL
 FREERTOS.FootprintOK=true
-FREERTOS.IPParameters=Tasks01,configUSE_NEWLIB_REENTRANT,FootprintOK,Timers01,Mutexes01,BinarySemaphores01
-FREERTOS.Mutexes01=telemetryFileMutex,Dynamic,NULL
-FREERTOS.Tasks01=defaultTask,24,128,StartDefaultTask,Default,NULL,Dynamic,NULL,NULL;rxDataThread,48,256,startRxDataThread,Default,NULL,Dynamic,NULL,NULL;txDataThread,40,2048,startTxDataThread,Default,NULL,Dynamic,NULL,NULL;telemetryThread,16,128,startTelemetryThread,Default,NULL,Dynamic,NULL,NULL
+FREERTOS.IPParameters=Tasks01,configUSE_NEWLIB_REENTRANT,FootprintOK,Timers01,BinarySemaphores01
+FREERTOS.Tasks01=defaultTask,24,128,StartDefaultTask,Default,NULL,Dynamic,NULL,NULL;rxDataThread,48,256,startRxDataThread,Default,NULL,Dynamic,NULL,NULL;txDataThread,40,256,startTxDataThread,Default,NULL,Dynamic,NULL,NULL;telemetryThread,16,128,startTelemetryThread,Default,NULL,Dynamic,NULL,NULL
 FREERTOS.Timers01=accTimer,accTimerCallback,osTimerPeriodic,Default,NULL,Dynamic,NULL;temperatureTimer,temperatureTimerCallback,osTimerPeriodic,Default,NULL,Dynamic,NULL
 FREERTOS.configUSE_NEWLIB_REENTRANT=1
 File.Version=6
