@@ -54,6 +54,7 @@ osStatus_t status;
 
 FATFS FatFs;
 FIL telemetryFile;
+FIL firmwareFile;
 
 
 /* USER CODE END Variables */
@@ -259,6 +260,7 @@ void startRxDataThread(void *argument)
 	FRESULT wr;
 	UINT bytesWrote;
 	int cmpRes;
+	int safeToBoot = 0;
 
 	uint8_t firmwareChunk[16];
   /* Infinite loop */
@@ -272,9 +274,9 @@ void startRxDataThread(void *argument)
 	  if (status != osOK) {
 		  myprintf("Could not take mutex for writing into file");
 	  } else {
-		  wr = f_open(&telemetryFile, "FIMWARE2.bin", FA_WRITE | FA_CREATE_ALWAYS);
-
+		  wr = f_open(&firmwareFile, "f.bin", FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
 		  osMutexRelease(telemetryFileMutexHandle);
+
 		  if(wr != FR_OK) {
 			  myprintf("f_open error (%i)\n", wr);
 		  } else {
@@ -283,11 +285,12 @@ void startRxDataThread(void *argument)
 				  HAL_UART_Receive(&huart2, firmwareChunk, 4, HAL_MAX_DELAY);
 				  cmpRes = strcmp(firmwareChunk, "$END");
 				  if (cmpRes == 0) {
+					  safeToBoot = 1;
 					  break;
 				  }
 
 				  osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
-				  wr = f_write(&telemetryFile, firmwareChunk, 4, &bytesWrote);
+				  wr = f_write(&firmwareFile, firmwareChunk, 4, &bytesWrote);
 				  osMutexRelease(telemetryFileMutexHandle);
 
 				  if (wr != FR_OK) {
@@ -298,12 +301,19 @@ void startRxDataThread(void *argument)
 
 
 			  osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
-			  f_close(&telemetryFile);
+			  f_close(&firmwareFile);
 			  osMutexRelease(telemetryFileMutexHandle);
 		  }
 	  }
 
-	 HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
+	 if (safeToBoot) {
+		 // toglle boot pin and software reset
+		 HAL_GPIO_WritePin(BootPin_GPIO_Port, BootPin_Pin, GPIO_PIN_SET);
+		 HAL_NVIC_SystemReset();
+	 } else {
+		 // try one more time
+		 HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
+	 }
   }
   /* USER CODE END startRxDataThread */
 }

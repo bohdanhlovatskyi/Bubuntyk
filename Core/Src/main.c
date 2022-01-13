@@ -38,6 +38,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define MAIN_PROGRAM_START_ADDRESS 0x8060000
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -85,7 +86,9 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  __disable_irq();
+  SCB->VTOR = (FLASH_BASE | 0x60000U);
+  __enable_irq();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
