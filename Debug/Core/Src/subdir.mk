@@ -14,6 +14,7 @@ C_SRCS += \
 ../Core/Src/i2c.c \
 ../Core/Src/main.c \
 ../Core/Src/mpu6050.c \
+../Core/Src/rtc.c \
 ../Core/Src/spi.c \
 ../Core/Src/stm32f4xx_hal_msp.c \
 ../Core/Src/stm32f4xx_hal_timebase_tim.c \
@@ -34,6 +35,7 @@ OBJS += \
 ./Core/Src/i2c.o \
 ./Core/Src/main.o \
 ./Core/Src/mpu6050.o \
+./Core/Src/rtc.o \
 ./Core/Src/spi.o \
 ./Core/Src/stm32f4xx_hal_msp.o \
 ./Core/Src/stm32f4xx_hal_timebase_tim.o \
@@ -54,6 +56,7 @@ C_DEPS += \
 ./Core/Src/i2c.d \
 ./Core/Src/main.d \
 ./Core/Src/mpu6050.d \
+./Core/Src/rtc.d \
 ./Core/Src/spi.d \
 ./Core/Src/stm32f4xx_hal_msp.d \
 ./Core/Src/stm32f4xx_hal_timebase_tim.d \

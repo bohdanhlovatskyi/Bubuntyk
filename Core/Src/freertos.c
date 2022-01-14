@@ -28,6 +28,8 @@
 /* USER CODE BEGIN Includes */
 #include "telemetry_base_class.h"
 #include "fatfs.h"
+
+#include "rtc.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -357,7 +359,12 @@ void startRxDataThread(void *argument)
 
 	 if (safeToBoot) {
 		 // toglle boot pin and software reset
-		 HAL_GPIO_WritePin(BootPin_GPIO_Port, BootPin_Pin, GPIO_PIN_SET);
+		 HAL_PWR_EnableBkUpAccess();
+		 HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, 1);
+		 HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2, 0);
+		 HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3, 1);
+		 HAL_PWR_DisableBkUpAccess();
+
 		 HAL_NVIC_SystemReset();
 	 } else {
 		 // try one more time
