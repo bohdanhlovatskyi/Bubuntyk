@@ -1,3 +1,0 @@
-mpu6050.c:5:5:MPU6050_Init	24	static
-mpu6050.c:27:6:MPU6050_GetAllData	40	static
-mpu6050.c:46:6:getAccAndGyroData	48	static
