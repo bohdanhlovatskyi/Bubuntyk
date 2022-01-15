@@ -13,3 +13,12 @@
 [submodule "sensor_projects/cubeide-sd-card"]
 	path = sensor_projects/cubeide-sd-card
 	url = https://github.com/kiwih/cubeide-sd-card
+[submodule "OV7670"]
+	path = OV7670
+	url = https://github.com/fox-flex/OV7670.git
+[submodule "sensor_projects/stm32sdcard"]
+	path = sensor_projects/stm32sdcard
+	url = https://github.com/sasha-tsepilova/stm32sdcard.git
+[submodule "sensor_projects/lora_ping_pong"]
+	path = sensor_projects/lora_ping_pong
+	url = https://github.com/bohdanhlovatskyi/lora_ping_pong
