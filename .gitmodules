@@ -4,3 +4,12 @@
 [submodule "boot"]
 	path = boot
 	url = https://github.com/bohdanhlovatskyi/boot.git
+[submodule "sensor_projects/Light_Sensors_STM32"]
+	path = sensor_projects/Light_Sensors_STM32
+	url = https://github.com/lamik/Light_Sensors_STM32
+[submodule "sensor_projects/gps"]
+	path = sensor_projects/gps
+	url = https://github.com/leech001/gps
+[submodule "sensor_projects/cubeide-sd-card"]
+	path = sensor_projects/cubeide-sd-card
+	url = https://github.com/kiwih/cubeide-sd-card
