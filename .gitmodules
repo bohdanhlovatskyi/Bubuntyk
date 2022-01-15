@@ -1,0 +1,6 @@
+[submodule "bubuntyk_server"]
+	path = bubuntyk_server
+	url = https://github.com/sasha-tsepilova/bubuntyk_server.git
+[submodule "boot"]
+	path = boot
+	url = https://github.com/bohdanhlovatskyi/boot.git
