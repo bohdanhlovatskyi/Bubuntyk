@@ -44,7 +44,8 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define printf(...) sprintf((char*) msg, __VA_ARGS__);\
+		HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -79,7 +80,7 @@ osThreadId_t txDataThreadHandle;
 const osThreadAttr_t txDataThread_attributes = {
   .name = "txDataThread",
   .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityHigh,
+  .priority = (osPriority_t) osPriorityRealtime,
 };
 /* Definitions for telemetryThread */
 osThreadId_t telemetryThreadHandle;
@@ -136,8 +137,12 @@ const osMessageQueueAttr_t telemetryQueue_attributes = {
 
 osMutexId_t telemetryFileMutexHandle;
 const osMutexAttr_t telemetryFileMutex_attributes = {
-  .name = "telemetryFileMutex",
-  .attr_bits = osMutexPrioInherit
+  .name = "telemetryFileMutex"
+};
+
+osMutexId_t uartMutexHandle;
+const osMutexAttr_t uartMutex_attributes = {
+ .name = "uartMutex"
 };
 /* USER CODE END FunctionPrototypes */
 
@@ -165,16 +170,17 @@ void MX_FREERTOS_Init(void) {
 	// second arg is basically prefic of path to file
 	FRESULT fres = f_mount(&FatFs, "", 1);
 	if (fres != FR_OK) {
-		myprintf("f_mount error (%i)\r\n", fres);
+		printf("f_mount error (%i)\r\n", fres);
 		Error_Handler();
 	} else {
-		myprintf("SD card mounted\n");
+		printf("SD card mounted\n");
 	}
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
   telemetryFileMutexHandle = osMutexNew(&telemetryFileMutex_attributes);
+  uartMutexHandle = osMutexNew(&uartMutex_attributes);
   /* USER CODE END RTOS_MUTEX */
 
   /* Create the semaphores(s) */
@@ -319,17 +325,18 @@ void startRxDataThread(void *argument)
   {
 	  osSemaphoreAcquire(rxThreadSemHandle, osWaitForever);
 
-	  myprintf("Firmware to be uploaded...\n");
+
+	  printf("Firmware to be uploaded...\n");
 
 	  status = osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
 	  if (status != osOK) {
-		  myprintf("Could not take mutex for writing into file");
+		  printf("Could not take mutex for writing into file");
 	  } else {
 		  wr = f_open(&firmwareFile, "f.bin", FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
 		  osMutexRelease(telemetryFileMutexHandle);
 
 		  if(wr != FR_OK) {
-			  myprintf("f_open error (%i)\n", wr);
+			  printf("f_open error (%i)\n", wr);
 		  } else {
 			  for (;;) {
 				  memset(firmwareChunk, 0, sizeof(firmwareChunk));
@@ -345,7 +352,7 @@ void startRxDataThread(void *argument)
 				  osMutexRelease(telemetryFileMutexHandle);
 
 				  if (wr != FR_OK) {
-					  myprintf("[ERROR]: f_write firmware (%d)\n", wr);
+					  printf("[ERROR]: f_write firmware (%d)\n", wr);
 					  break;
 				  }
 			  }
@@ -384,47 +391,34 @@ void startRxDataThread(void *argument)
 void startTxDataThread(void *argument)
 {
   /* USER CODE BEGIN startTxDataThread */
-	FRESULT rr;
+	FRESULT rr = FR_OK;
 	// TODO: get rid of magic constants
-	BYTE rbuf[32] = {0};
+	BYTE rbuf[128] = {0};
   /* Infinite loop */
   for(;;)
   {
-	  status = osSemaphoreAcquire(txThreadSemHandle, osWaitForever);
-	  myprintf("[INFO]: txDataThread : sem acquire : (%d)\n", status);
+	  if (rr != FR_OK) {
+		  // printf("[ERROR]: reading : (%i)\n", rr);
+	  }
 
-
-	  // there is no need to take mutex, as currenlty this is the only task
-	  // that actually uses uart (if we omit the debug part)
+	  osSemaphoreAcquire(txThreadSemHandle, osWaitForever);
 
 	  // read from sd and write the info into uart (mock gprs)
-	  status = osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
-	  if (status != osOK) {
-		  myprintf("Could not take mutex for reading into file");
-	  } else {
-		  rr = f_open(&telemetryFile, "write.txt", FA_READ);
-
-		  if(rr != FR_OK) {
-			  osMutexRelease(telemetryFileMutexHandle);
-			  myprintf("[ERROR]: (reading) f_open (%i)\n", rr);
-		  } else {
-			  // TODO: do we really need this one here ?
-			  // f_lseek(&telemetryFile, 0);
-
-			  unsigned int bytesRead = 1;
-		  	  while (bytesRead != 0) {
-			  	  f_read(&telemetryFile, &rbuf, sizeof(rbuf), &bytesRead);
-			  	  osMutexRelease(telemetryFileMutexHandle);
-			  	  myprintf("[READ]: %s\n", rbuf);
-			  	  osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
-		  	  }
-
-		  	  f_close(&telemetryFile);
-		  	  f_unlink("write.txt");
-
-		  	  osMutexRelease(telemetryFileMutexHandle);
-		  }
+	  osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
+	  rr = f_open(&telemetryFile, "write.txt", FA_WRITE | FA_READ | FA_OPEN_ALWAYS);
+	  if(rr != FR_OK) {
+		  osMutexRelease(telemetryFileMutexHandle);
+		  HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
+		  continue;
 	  }
+
+	  while (f_gets((TCHAR*)rbuf, sizeof(rbuf), &telemetryFile)) {
+		  printf("[READ]: %s", rbuf);
+	  }
+
+	  f_close(&telemetryFile);
+	  f_unlink("write.txt");
+	  osMutexRelease(telemetryFileMutexHandle);
 
 	  HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
   }
@@ -442,52 +436,35 @@ void startTelemetryThread(void *argument)
 {
   /* USER CODE BEGIN startTelemetryThread */
   TelemetryBase tb;
-  FRESULT wr;
+  FRESULT wr = FR_OK;
   // TODO: get rid of magic constant
   BYTE wbuf[128] = {0};
 
   /* Infinite loop */
   for(;;)
   {
-	 status = osMessageQueueGet(telemetryQueueHandle, &tb, NULL, osWaitForever);
-	 if (status == osOK) {
-		 // write into sd card
+	 if (wr != FR_OK) {
+		 printf("[ERROR]: writing telemetry : (%i)\n", wr);
+	 }
 
-		 sprintf(wbuf, "Telemetry{%d, %u, {%d, %d, %d}}\n",
+	 osMessageQueueGet(telemetryQueueHandle, &tb, NULL, osWaitForever);
+
+	 sprintf(wbuf, "Telemetry{%d, %u, {%d, %d, %d}}\n",
 				 tb.id, tb.data_size, tb.data[0],
 				 tb.data[1], tb.data[2]);
-		 myprintf("Writing following string to sd: %s", wbuf);
+	 printf("Writing following string to sd: %s", wbuf);
 
 
-		 // TODO: add mutex here
-		 status = osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
-		 if (status != osOK) {
-			 myprintf("Could not take mutex for writing into file");
-		 } else {
-		 	 wr = f_open(&telemetryFile, "write.txt", FA_OPEN_APPEND | FA_WRITE | FA_OPEN_ALWAYS);
-
-
-		 	 if(wr == FR_OK) {
-		 		 myprintf("I was able to open '%s' for writing\n", TELEMETRY_FILE);
-		 	 } else {
-		 		 myprintf("f_open error (%i)\n", wr);
-		 	 }
-
-
-		 	 UINT bytesWrote;
-		 	 // TODO: and also I assume we should add mutex here
-		 	 wr = f_write(&telemetryFile, wbuf, strlen(wbuf), &bytesWrote);
-		 	 if(wr == FR_OK) {
-		 		 myprintf("Wrote %i bytes to 'write.txt'!\n", bytesWrote);
-		 	 } else {
-		 		 myprintf("f_write error (%d)\n", (int) bytesWrote);
-		 	 }
-
-		 	 f_close(&telemetryFile);
-	 	 }
-
+	 osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
+	 wr = f_open(&telemetryFile, "write.txt", FA_OPEN_APPEND | FA_WRITE | FA_READ | FA_OPEN_ALWAYS);
+	 if(wr != FR_OK) {
 		 osMutexRelease(telemetryFileMutexHandle);
+		 continue;
 	 }
+
+	 wr = f_write(&telemetryFile, wbuf, strlen(wbuf), NULL);
+	 f_close(&telemetryFile);
+	 osMutexRelease(telemetryFileMutexHandle);
   }
   /* USER CODE END startTelemetryThread */
 }
@@ -628,10 +605,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 			 break;
 		 case 1:
 			 status = osSemaphoreRelease(txThreadSemHandle);
-			 myprintf("[INFO]: status of semaphore release: %d\n", status);
 			 break;
 		 default:
-			 myprintf("[ERROR]: Op not allowed: %d\n", val);
+			 // printf("[ERROR]: Op not allowed: %d\n", val);
 			 HAL_UART_Receive_IT(&huart2, (uint8_t *)&notification_buffer, 1);
 			 break;
 		 };
