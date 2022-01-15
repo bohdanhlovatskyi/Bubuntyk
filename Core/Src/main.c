@@ -130,6 +130,8 @@ int main(void)
 	  HAL_Delay(2000);
   }
 
+  gsm_config_gprs();
+
   // run in the background receive from uart
   // in order to implment possibility to wake up
   HAL_UART_Receive_IT(&huart2, (uint8_t *)notification_buffer, 1);

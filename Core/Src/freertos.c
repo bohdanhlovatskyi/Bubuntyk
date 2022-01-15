@@ -45,7 +45,8 @@
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 #define printf(...) sprintf((char*) msg, __VA_ARGS__);\
-		HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
+		gsm_http_post(msg)
+		// HAL_UART_Transmit(&huart2, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);  \
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -452,7 +453,7 @@ void startTelemetryThread(void *argument)
 	 sprintf(wbuf, "Telemetry{%d, %u, {%d, %d, %d}}\n",
 				 tb.id, tb.data_size, tb.data[0],
 				 tb.data[1], tb.data[2]);
-	 printf("Writing following string to sd: %s", wbuf);
+	 // printf("Writing following string to sd: %s", wbuf);
 
 
 	 osMutexAcquire(telemetryFileMutexHandle, osWaitForever);
