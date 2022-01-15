@@ -22,3 +22,6 @@
 [submodule "sensor_projects/lora_ping_pong"]
 	path = sensor_projects/lora_ping_pong
 	url = https://github.com/bohdanhlovatskyi/lora_ping_pong
+[submodule "sensor_projects/mpu6050"]
+	path = sensor_projects/mpu6050
+	url = https://github.com/bohdanhlovatskyi/mpu6050.git
